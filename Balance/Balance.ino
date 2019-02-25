@@ -167,9 +167,9 @@ void getMachineState() {
   RwAcc[1] = a.acceleration.y / 9.80665; // m/s^2 in g
   RwAcc[2] = a.acceleration.z / 9.80665; // m/s^2 in g
 
-  GyroTemp[0] = g.gyro.y / 1000;
-  GyroTemp[1] = g.gyro.x / 1000;
-  GyroTemp[2] = g.gyro.z / 1000;
+  GyroTemp[0] = g.gyro.y / 1000; // Gyro in deg / ms
+  GyroTemp[1] = g.gyro.x / 1000; // Gyro in deg / ms
+  GyroTemp[2] = g.gyro.z / 1000; // Gyro in deg / ms
 }
 
 void setup() {
@@ -203,7 +203,7 @@ void loop() {
   getMachineState();
   ApplyFiltering();
   UpdatePIDController_X();
-    cUpdatePIDController_Y();
+  UpdatePIDController_Y();
   delay(1000 / UPDATE_FREQUENCY);
   //Serial.print(RwEst[0]*10);
   //Serial.print(" ");
