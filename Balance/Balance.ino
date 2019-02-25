@@ -35,14 +35,23 @@ float goal_x_angle = 90;
 float goal_y_angle = 90;
 float current_steering_angle = 0;
 
-bool  Clamped = false;
-float IntegralTerm = 0;
-float DerivativeTerm = 0;
-float PID_Output = 0;
-float X_AngleError = 0;
-float Y_AngleError = 0;
-float lastXAngleError = 0;
-float lastYAngleError = 0;
+struct {          
+  bool  Clamped = false;
+  float IntegralTerm = 0;
+  float DerivativeTerm = 0;
+  float PID_Output = 0;
+  float AngleError = 0;
+  float lastAngleError = 0;
+} x_config; 
+
+struct {          
+  bool  Clamped = false;
+  float IntegralTerm = 0;
+  float DerivativeTerm = 0;
+  float PID_Output = 0;
+  float AngleError = 0;
+  float lastAngleError = 0;
+} y_config; 
 
 Servo X_Servo;
 Servo Y_Servo;
@@ -62,11 +71,11 @@ float Awz[2];           //angles between projection of R on XZ/YZ plane and Z ax
 // Bound the input value between x_min and x_max. Also works in anti-windup
 int CheckClamp(int x) {
   int angle = constrain(x, MIN_SPEED, MAX_SPEED); // Angle Limit
-  Clamped = not (angle == x);
+  y_config.Clamped = not (angle == x);
   return angle;
 }
 
-void ApplyFiltering() {
+void ApplyKalmanFiltering() {
   static int w;
   static float tmpf, tmpf2;
   static unsigned long newMicros; //new timestamp
@@ -117,22 +126,22 @@ void ApplyFiltering() {
 
 void UpdatePIDController_X() {
   // compute the error between the measurement and the desired value
-  X_AngleError = -ShortestAngularPath(g2degree(RwEst[1]), goal_x_angle);
-  if (abs(X_AngleError) <= DEADZONE) { // Deadzone // Stop if close enough to prevent oscillations
+  x_config.AngleError = -ShortestAngularPath(g2degree(RwEst[1]), goal_x_angle);
+  if (abs(x_config.AngleError) <= DEADZONE) { // Deadzone // Stop if close enough to prevent oscillations
     current_x_speed_setting = 90;
     set_X_Speed(current_x_speed_setting);
   } else {
-    DerivativeTerm = X_AngleError - lastXAngleError;
+    x_config.DerivativeTerm = x_config.AngleError - x_config.lastAngleError;
     // If the actuator is saturating ignore the integral term
     // if the system is clamped and the sign of the integrator term and the sign of the PID output are the same
-    if (Clamped and ((PID_Output / abs(PID_Output)) == (IntegralTerm / abs(IntegralTerm)))) {
-      IntegralTerm += 0;
+    if (x_config.Clamped and ((x_config.PID_Output / abs(x_config.PID_Output)) == (x_config.IntegralTerm / abs(x_config.IntegralTerm)))) {
+      x_config.IntegralTerm += 0;
     } else {
-      IntegralTerm += X_AngleError;
+      x_config.IntegralTerm += x_config.AngleError;
     }
     // compute the control effort by multiplying the error by Kp
-    PID_Output = (X_AngleError * P_GAIN) + (IntegralTerm * I_GAIN) + (DerivativeTerm * D_GAIN);
-    current_x_speed_setting += PID_Output;
+    x_config.PID_Output = (x_config.AngleError * P_GAIN) + (x_config.IntegralTerm * I_GAIN) + (x_config.DerivativeTerm * D_GAIN);
+    current_x_speed_setting += x_config.PID_Output;
 
     // make sure the output value is bounded to 0 to 100 using the bound function defined below
     current_x_speed_setting = CheckClamp(current_x_speed_setting);
@@ -142,22 +151,22 @@ void UpdatePIDController_X() {
 
 void UpdatePIDController_Y() {
   // compute the error between the measurement and the desired value
-  Y_AngleError = -ShortestAngularPath(g2degree(RwEst[0]), goal_y_angle); // Minimum degree shifts in order to reach goal
-  if (abs(Y_AngleError) <= DEADZONE) { // Deadzone
-    current_x_speed_setting = 90;
-    set_Y_Speed(current_x_speed_setting);
+  y_config.AngleError = ShortestAngularPath(g2degree(RwEst[0]), goal_y_angle); // Minimum degree shifts in order to reach goal
+  if (abs(y_config.AngleError) <= DEADZONE) { // Deadzone
+    current_y_speed_setting = 90;
+    set_Y_Speed(current_y_speed_setting);
   } else {
-    DerivativeTerm = Y_AngleError - lastYAngleError;
+    y_config.DerivativeTerm = y_config.AngleError - y_config.lastAngleError;
     // If the actuator is saturating ignore the integral term
     // if the system is clamped and the sign of the integrator term and the sign of the PID output are the same
-    if (Clamped and ((PID_Output / abs(PID_Output)) == (IntegralTerm / abs(IntegralTerm)))) {
-      IntegralTerm += 0;
+    if (y_config.Clamped and ((y_config.PID_Output / abs(y_config.PID_Output)) == (y_config.IntegralTerm / abs(y_config.IntegralTerm)))) {
+      y_config.IntegralTerm += 0; 
     } else {
-      IntegralTerm += Y_AngleError;
+      y_config.IntegralTerm += y_config.AngleError;
     }
     // compute the control effort by multiplying the error by Kp
-    PID_Output = (Y_AngleError * P_GAIN) + (IntegralTerm * I_GAIN) + (DerivativeTerm * D_GAIN);
-    current_y_speed_setting += PID_Output;
+    y_config.PID_Output = (y_config.AngleError * P_GAIN) + (y_config.IntegralTerm * I_GAIN) + (y_config.DerivativeTerm * D_GAIN);
+    current_y_speed_setting += y_config.PID_Output;
 
     // make sure the output value is bounded to 0 to 100 using the bound function defined below
     current_y_speed_setting = CheckClamp(current_y_speed_setting);
@@ -216,7 +225,7 @@ void setup() {
 void loop() {
   unsigned long time = millis(); // time - lastMilli == time passed
   getMachineState();
-  ApplyFiltering();
+  ApplyKalmanFiltering();
   UpdatePIDController_X();
   UpdatePIDController_Y();
   delay(1000 / UPDATE_FREQUENCY);
