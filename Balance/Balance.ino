@@ -18,10 +18,18 @@ int   UPDATE_FREQUENCY = 300; //Hz
 #define MIN_SPEED       85 // %
 #define MAX_SPEED       105 // %
 
+#define Y_MIN_SPEED       85 // %
+#define Y_MAX_SPEED       95 // %
+
+
+#define LoopTime        100   // PID loop time(ms)
 //Globals
+unsigned long lastMilli = 0; // time at the end of the last loop
 
 int current_x_speed_setting = 0;
 int current_y_speed_setting = 0;
+int actual_x_angle = 0;
+int actual_y_angle = 0;
 
 float goal_x_angle = 90;
 float goal_y_angle = 90;
@@ -68,6 +76,7 @@ void ApplyFiltering() {
   //compute interval since last sampling time
   interval = newMicros - lastMicros;    //please note that overflows are ok, since for example 0x0001 - 0x00FE will be equal to 2
   lastMicros = newMicros;               //save for next loop, please note interval will be invalid in first sample but we don't use it
+
 
   //normalize vector (convert to a vector with same direction and with length 1)
   normalize3DVector(RwAcc);
@@ -156,6 +165,11 @@ void UpdatePIDController_Y() {
   }
 }
 
+float mapfloat(long x, long in_min, long in_max, long out_min, long out_max)
+{
+  return (float)(x - in_min) * (out_max - out_min) / (float)(in_max - in_min) + out_min;
+}
+
 void getMachineState() {
   // Convert DOF data to angles
   lsm.read();  /* ask it to read in the data */
@@ -167,9 +181,9 @@ void getMachineState() {
   RwAcc[1] = a.acceleration.y / 9.80665; // m/s^2 in g
   RwAcc[2] = a.acceleration.z / 9.80665; // m/s^2 in g
 
-  GyroTemp[0] = g.gyro.y / 1000; // Gyro in deg / ms
-  GyroTemp[1] = g.gyro.x / 1000; // Gyro in deg / ms
-  GyroTemp[2] = g.gyro.z / 1000; // Gyro in deg / ms
+  GyroTemp[0] = g.gyro.y / 1000;
+  GyroTemp[1] = g.gyro.x / 1000;
+  GyroTemp[2] = g.gyro.z / 1000;
 }
 
 void setup() {
@@ -200,6 +214,7 @@ void setup() {
 }
 
 void loop() {
+  unsigned long time = millis(); // time - lastMilli == time passed
   getMachineState();
   ApplyFiltering();
   UpdatePIDController_X();
@@ -228,12 +243,12 @@ float ShortestAngularPath(int angle, int goal) {
 void set_X_Speed(int angle) {
   angle = constrain(angle, MIN_SPEED, MAX_SPEED);
   X_Servo.write(angle);
-  Serial.print("X Servo Set to: ");
-  Serial.println(angle);
+  // Serial.print("X Servo Set to: ");
+  // Serial.println(angle);
 }
 
 void set_Y_Speed(int angle) {
-  angle = constrain(angle, MIN_SPEED, MAX_SPEED);
+  angle = constrain(angle, Y_MIN_SPEED, Y_MAX_SPEED);
   Y_Servo.write(angle);
   // Serial.print("Y Servo Set to: ");
   // Serial.println(angle);
@@ -266,10 +281,6 @@ void setupSensor() {
   lsm.setupGyro(lsm.LSM9DS1_GYROSCALE_245DPS);
 }
 
-float squared(float x) {
-  return x * x;
-}
+float squared(float x) {return x * x;}
 
-int g2degree(float g) {
-  return constrain(((g + 1) / 2) * 180, 0, 180);
-}
+int g2degree(float g) {return constrain(((g + 1) / 2) * 180, 0, 180);}
