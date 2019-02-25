@@ -156,11 +156,6 @@ void UpdatePIDController_Y() {
   }
 }
 
-float mapfloat(long x, long in_min, long in_max, long out_min, long out_max)
-{
-  return (float)(x - in_min) * (out_max - out_min) / (float)(in_max - in_min) + out_min;
-}
-
 void getMachineState() {
   // Convert DOF data to angles
   lsm.read();  /* ask it to read in the data */
