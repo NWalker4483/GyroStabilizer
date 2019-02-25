@@ -18,15 +18,10 @@ int   UPDATE_FREQUENCY = 300; //Hz
 #define MIN_SPEED       85 // %
 #define MAX_SPEED       105 // %
 
-
-#define LoopTime        100   // PID loop time(ms)
 //Globals
-unsigned long lastMilli = 0; // time at the end of the last loop
 
 int current_x_speed_setting = 0;
 int current_y_speed_setting = 0;
-int actual_x_angle = 0;
-int actual_y_angle = 0;
 
 float goal_x_angle = 90;
 float goal_y_angle = 90;
@@ -73,7 +68,6 @@ void ApplyFiltering() {
   //compute interval since last sampling time
   interval = newMicros - lastMicros;    //please note that overflows are ok, since for example 0x0001 - 0x00FE will be equal to 2
   lastMicros = newMicros;               //save for next loop, please note interval will be invalid in first sample but we don't use it
-
 
   //normalize vector (convert to a vector with same direction and with length 1)
   normalize3DVector(RwAcc);
@@ -211,7 +205,6 @@ void setup() {
 }
 
 void loop() {
-  unsigned long time = millis(); // time - lastMilli == time passed
   getMachineState();
   ApplyFiltering();
   UpdatePIDController_X();
