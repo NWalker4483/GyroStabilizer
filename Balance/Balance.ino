@@ -35,24 +35,17 @@ float goal_x_angle = 90;
 float goal_y_angle = 90;
 float current_steering_angle = 0;
 
-struct {          
+struct config {          
   bool  Clamped = false;
   float IntegralTerm = 0;
   float DerivativeTerm = 0;
   float PID_Output = 0;
   float AngleError = 0;
   float lastAngleError = 0;
-} x_config; 
+}; 
 
-struct {          
-  bool  Clamped = false;
-  float IntegralTerm = 0;
-  float DerivativeTerm = 0;
-  float PID_Output = 0;
-  float AngleError = 0;
-  float lastAngleError = 0;
-} y_config; 
-
+struct config x_config;
+struct config y_config;
 Servo X_Servo;
 Servo Y_Servo;
 // Initialize the IMU Sensor
@@ -69,9 +62,9 @@ float GyroTemp[3];
 float Awz[2];           //angles between projection of R on XZ/YZ plane and Z axis (deg)
 
 // Bound the input value between x_min and x_max. Also works in anti-windup
-int CheckClamp(int x) {
+int CheckClamp(int x, struct config beta) {
   int angle = constrain(x, MIN_SPEED, MAX_SPEED); // Angle Limit
-  y_config.Clamped = not (angle == x);
+  beta.Clamped = not (angle == x);
   return angle;
 }
 
@@ -144,7 +137,7 @@ void UpdatePIDController_X() {
     current_x_speed_setting += x_config.PID_Output;
 
     // make sure the output value is bounded to 0 to 100 using the bound function defined below
-    current_x_speed_setting = CheckClamp(current_x_speed_setting);
+    current_x_speed_setting = CheckClamp(current_x_speed_setting,x_config);
     set_X_Speed(current_x_speed_setting); // then write it to the LED pin to change control voltage to LED
   }
 }
@@ -169,19 +162,14 @@ void UpdatePIDController_Y() {
     current_y_speed_setting += y_config.PID_Output;
 
     // make sure the output value is bounded to 0 to 100 using the bound function defined below
-    current_y_speed_setting = CheckClamp(current_y_speed_setting);
+    current_y_speed_setting = CheckClamp(current_y_speed_setting,y_config);
     set_Y_Speed(current_y_speed_setting); // then write it to the LED pin to change control voltage to LED
   }
 }
 
-float mapfloat(long x, long in_min, long in_max, long out_min, long out_max)
-{
-  return (float)(x - in_min) * (out_max - out_min) / (float)(in_max - in_min) + out_min;
-}
-
 void getMachineState() {
   // Convert DOF data to angles
-  lsm.read();  /* ask it to read in the data */
+  lsm.read();
   sensors_event_t a, m, g, temp;
   bool isUpsideDown;
   lsm.getEvent(&a, &m, &g, &temp);
@@ -223,15 +211,11 @@ void setup() {
 }
 
 void loop() {
-  unsigned long time = millis(); // time - lastMilli == time passed
   getMachineState();
   ApplyKalmanFiltering();
   UpdatePIDController_X();
   UpdatePIDController_Y();
-  delay(1000 / UPDATE_FREQUENCY);
-  //Serial.print(RwEst[0]*10);
-  //Serial.print(" ");
-  //Serial.println(RwAcc[0]*10);
+  delay(1000 / UPDATE_FREQUENCY); 
 }
 
 // Minimum degree shifts in order to reach goal
@@ -252,15 +236,11 @@ float ShortestAngularPath(int angle, int goal) {
 void set_X_Speed(int angle) {
   angle = constrain(angle, MIN_SPEED, MAX_SPEED);
   X_Servo.write(angle);
-  // Serial.print("X Servo Set to: ");
-  // Serial.println(angle);
 }
 
 void set_Y_Speed(int angle) {
   angle = constrain(angle, Y_MIN_SPEED, Y_MAX_SPEED);
   Y_Servo.write(angle);
-  // Serial.print("Y Servo Set to: ");
-  // Serial.println(angle);
 }
 
 void set_X_Goal(int angle) { // -180 :-: 180
